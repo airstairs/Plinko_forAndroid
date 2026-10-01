@@ -1,2 +1,8 @@
 # Plinko!_forAndroid
-drop the ball
+drop the ball  
+
+![ic](ic.png)  
+
+![rec](rec.gif)  
+
+

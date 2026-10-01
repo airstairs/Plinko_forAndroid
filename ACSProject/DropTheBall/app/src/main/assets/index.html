@@ -1,0 +1,942 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Drop the Ball</title>
+  <style>
+    :root {
+      --android-green: #1E88E5;
+      --android-dark-green: #0D47A1;
+      --highlight-orange: #FF9800;
+      --bg-dark: #121212;
+      --surface-dark: #1E1E1E;
+      --text-light: #E0E0E0;
+    }
+
+    * {
+      box-sizing: border-box;
+      user-select: none;
+      -webkit-user-select: none;
+      touch-action: none;
+    }
+
+    body, html {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: var(--bg-dark);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      color: var(--text-light);
+    }
+
+    #canvas-container {
+      width: 100%;
+      height: 100%;
+      position: absolute;
+      top: 0;
+      left: 0;
+      z-index: 1;
+    }
+
+    #ui-layer {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 10;
+      pointer-events: none;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 16px;
+    }
+
+    .header {
+      background: rgba(30, 30, 30, 0.85);
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(30, 136, 229, 0.3);
+      border-radius: 12px;
+      padding: 12px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+    }
+
+    .title {
+      font-size: 1.2rem;
+      font-weight: 700;
+      color: #1E88E5;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .stats {
+      display: flex;
+      gap: 16px;
+    }
+
+    .stat-box {
+      text-align: center;
+    }
+
+    .stat-label {
+      font-size: 0.65rem;
+      text-transform: uppercase;
+      color: #A0A0A0;
+      letter-spacing: 0.5px;
+    }
+
+    .stat-value {
+      font-size: 1.2rem;
+      font-weight: 800;
+      color: #FFFFFF;
+    }
+
+    .target-highlight {
+      color: var(--highlight-orange) !important;
+      text-shadow: 0 0 10px rgba(255, 152, 0, 0.6);
+    }
+
+    .instructions {
+      position: absolute;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(30, 30, 30, 0.9);
+      border: 1px solid #1E88E5;
+      padding: 10px 20px;
+      border-radius: 20px;
+      font-size: 0.9rem;
+      color: #1E88E5;
+      text-align: center;
+      box-shadow: 0 0 15px rgba(30, 136, 229, 0.2);
+      transition: opacity 0.3s ease;
+      pointer-events: auto;
+    }
+
+    .instructions.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .controls-bar {
+      position: absolute;
+      top: 80px;
+      right: 16px;
+      display: flex;
+      gap: 8px;
+      pointer-events: auto;
+    }
+
+    .btn-ui {
+      background: rgba(30, 30, 30, 0.85);
+      border: 1px solid rgba(30, 136, 229, 0.5);
+      color: #1E88E5;
+      padding: 8px 14px;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 0.8rem;
+      cursor: pointer;
+      backdrop-filter: blur(4px);
+      transition: all 0.2s ease;
+    }
+
+    .btn-ui:hover {
+      background: rgba(30, 136, 229, 0.2);
+      border-color: #1E88E5;
+    }
+
+    .btn-orange {
+      border-color: rgba(255, 152, 0, 0.5);
+      color: var(--highlight-orange);
+    }
+
+    .btn-orange:hover {
+      background: rgba(255, 152, 0, 0.2);
+      border-color: var(--highlight-orange);
+    }
+
+    /* --- MODAL DIALOG POPUP --- */
+    .modal-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.75);
+      backdrop-filter: blur(6px);
+      z-index: 100;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+      opacity: 1;
+      transition: opacity 0.3s ease;
+      pointer-events: auto;
+    }
+
+    .modal-overlay.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .modal-card {
+      background: var(--surface-dark);
+      border: 1px solid var(--android-green);
+      border-radius: 16px;
+      width: 100%;
+      max-width: 440px;
+      padding: 24px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.8), 0 0 20px rgba(30, 136, 229, 0.2);
+      transform: translateY(0);
+      transition: transform 0.3s ease;
+    }
+
+    .modal-header {
+      font-size: 1.4rem;
+      font-weight: 800;
+      color: var(--android-green);
+      margin-bottom: 16px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .modal-body {
+      font-size: 0.95rem;
+      line-height: 1.5;
+      color: var(--text-light);
+      margin-bottom: 24px;
+    }
+
+    .modal-body ul {
+      padding-left: 20px;
+      margin: 12px 0;
+    }
+
+    .modal-body li {
+      margin-bottom: 8px;
+    }
+
+    .highlight-text {
+      color: var(--highlight-orange);
+      font-weight: 700;
+    }
+
+    .modal-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .btn-primary {
+      background: var(--android-green);
+      color: #FFFFFF;
+      border: none;
+      padding: 12px;
+      border-radius: 10px;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      text-align: center;
+      box-shadow: 0 4px 12px rgba(30, 136, 229, 0.4);
+      transition: background 0.2s;
+    }
+
+    .btn-primary:hover {
+      background: var(--android-dark-green);
+    }
+  </style>
+
+  <script src="three.min.js"></script>
+</head>
+<body>
+
+  <div id="canvas-container"></div>
+
+  <div id="ui-layer">
+    <div class="header">
+      <div class="title">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="#1E88E5">
+          <path d="M6 18c0 .55.45 1 1 1h1v3c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-3h2v3c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-3h1c.55 0 1-.45 1-1V9H6v9zm11.5-12.02l1.29-1.29c.39-.39.39-1.02 0-1.41-.39-.39-1.02-.39-1.41 0L16 4.56C14.81 4.02 13.46 3.7 12 3.7s-2.81.32-4 .86L6.62 3.28c-.39-.39-1.02-.39-1.41 0-.39.39-.39 1.02 0 1.41l1.29 1.29C4.84 7.21 3.7 9.27 3.7 11.5h16.6c0-2.23-1.14-4.29-2.8-5.52zM9 9c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1zm6 0c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1z"/>
+        </svg>
+        Drop The Ball
+      </div>
+      <div class="stats">
+        <div class="stat-box">
+          <div class="stat-label">Round</div>
+          <div class="stat-value" id="round-val">1</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-label">Target Bucket</div>
+          <div class="stat-value target-highlight" id="target-val">#5</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-label">Score</div>
+          <div class="stat-value" id="score-val">0</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="controls-bar">
+      <button class="btn-ui btn-orange" onclick="changeTargetPosition()">Randomize Goal</button>
+      <button class="btn-ui" onclick="openRulesModal()">Rules</button>
+      <button class="btn-ui" onclick="resetGame()">Reset Game</button>
+    </div>
+
+    <div class="instructions" id="instructions">Drag ball horizontally and release to drop!</div>
+  </div>
+
+  <!-- RULES POPUP DIALOG -->
+  <div class="modal-overlay" id="rules-modal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="#1E88E5">
+          <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/>
+        </svg>
+        Game Instructions
+      </div>
+      <div class="modal-body">
+        <ul>
+          <li><strong>Controls:</strong> Click/touch and drag horizontally at the top, then release to drop the glowing ball.</li>
+          <li><strong>Goal:</strong> Guide the ball into the glowing <span class="highlight-text">Orange Target Bucket</span> to score <strong>+100 points</strong>.</li>
+          <li><strong>Goal Persistence:</strong> The target bucket stays the same across rounds until you click <strong>"Reset Game"</strong> or manually change it.</li>
+          <li><strong>Changing Target Position:</strong> Use the <span class="highlight-text">"Randomize Goal"</span> button anytime in the top right to shift the orange target to a new location.</li>
+        </ul>
+      </div>
+      <div class="modal-actions">
+        <button class="btn-primary" onclick="closeRulesModal()">Play Game</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // --- BOARD CONFIGURATION ---
+    const BOARD_WIDTH = 14;
+    const BOARD_HEIGHT = 22;
+    const BOARD_ANGLE = (70 * Math.PI) / 180;
+    const BALL_RADIUS = 0.45;
+    const POLE_RADIUS = 0.25;
+    const NUM_BUCKETS = 9;
+    const ROWS = 9;
+    const COLS_EVEN = 7;
+    const COLS_ODD = 8;
+
+    // --- GAME STATE ---
+    let score = 0;
+    let round = 1;
+    let targetBucket = 0;
+    let ballState = 'PRE_DROP';
+    let activePoles = [];
+    let bucketDividers = [];
+    let dragOffset = 0;
+    let stuckTimer = 0;
+
+    // --- THREE.JS SETUP & PHYSICS STATE ---
+    let scene, camera, renderer;
+    let ballMesh;
+    let raycaster, mouse, plane;
+    let isDragging = false;
+
+    // Custom Physics Ball State
+    const ballPhysics = {
+      pos: new THREE.Vector3(0, 0, 0),
+      vel: new THREE.Vector3(0, 0, 0),
+      radius: BALL_RADIUS,
+      restitution: 0.55,
+      friction: 0.985
+    };
+
+    const GRAVITY_Y = -35.0 * Math.sin(BOARD_ANGLE);
+
+    // --- MATERIALS ---
+    let matDark, matBlue, matBlueEmissive, matOrangeTarget, matBallGreen;
+
+    function init() {
+      // 1. Three Scene Setup
+      scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x121212);
+      scene.fog = new THREE.FogExp2(0x121212, 0.02);
+
+      camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+      
+      const camDist = 28;
+      const camTarget = new THREE.Vector3(0, 0, 0);
+      camera.position.copy(new THREE.Vector3(0, 0, camDist).applyAxisAngle(new THREE.Vector3(1, 0, 0), -BOARD_ANGLE));
+      camera.lookAt(camTarget);
+      camera.up.set(0, 1, 0).applyAxisAngle(new THREE.Vector3(1, 0, 0), -BOARD_ANGLE);
+
+      renderer = new THREE.WebGLRenderer({ antialias: true });
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+      document.getElementById('canvas-container').appendChild(renderer.domElement);
+
+      raycaster = new THREE.Raycaster();
+      mouse = new THREE.Vector2();
+      plane = new THREE.Plane(new THREE.Vector3(0, Math.sin(BOARD_ANGLE), Math.cos(BOARD_ANGLE)), 0);
+
+      // 2. Materials
+      matDark = new THREE.MeshStandardMaterial({ color: 0x1E1E1E, roughness: 0.4, metalness: 0.1 });
+      matBlue = new THREE.MeshStandardMaterial({ color: 0x1E88E5, roughness: 0.2, metalness: 0.3 });
+      matBlueEmissive = new THREE.MeshStandardMaterial({ color: 0x1E88E5, emissive: 0x1E88E5, emissiveIntensity: 0.6 });
+      matOrangeTarget = new THREE.MeshStandardMaterial({ color: 0xFF9800, emissive: 0xFF9800, emissiveIntensity: 0.9 });
+      
+      // Android Green for the Ball
+      matBallGreen = new THREE.MeshStandardMaterial({ color: 0xA4C639, emissive: 0xA4C639, emissiveIntensity: 0.6 });
+
+      // 3. Lights
+      const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+      scene.add(ambientLight);
+
+      const dirLight = new THREE.DirectionalLight(0x1E88E5, 0.8);
+      const lightPos = new THREE.Vector3(5, 30, 20).applyAxisAngle(new THREE.Vector3(1, 0, 0), -BOARD_ANGLE);
+      dirLight.position.copy(lightPos);
+      dirLight.castShadow = true;
+      dirLight.shadow.mapSize.width = 2048;
+      dirLight.shadow.mapSize.height = 2048;
+      scene.add(dirLight);
+
+      const pointLight = new THREE.PointLight(0xffffff, 0.4);
+      const pointPos = new THREE.Vector3(-10, 10, 10).applyAxisAngle(new THREE.Vector3(1, 0, 0), -BOARD_ANGLE);
+      pointLight.position.copy(pointPos);
+      scene.add(pointLight);
+
+      // 4. Build Environment
+      buildBoard();
+      buildBuckets();
+      buildPegsAndHoles();
+      createBall();
+
+      pickRandomTarget();
+
+      // 5. Interaction Listeners
+      window.addEventListener('resize', onWindowResize);
+      
+      const canvas = renderer.domElement;
+      canvas.addEventListener('pointerdown', onPointerDown);
+      canvas.addEventListener('pointermove', onPointerMove);
+      canvas.addEventListener('pointerup', onPointerUp);
+
+      animate();
+    }
+
+    function buildBoard() {
+      const boardGroup = new THREE.Group();
+      boardGroup.rotation.x = -BOARD_ANGLE;
+
+      const boardGeo = new THREE.BoxGeometry(BOARD_WIDTH, BOARD_HEIGHT, 0.2);
+      const boardMesh = new THREE.Mesh(boardGeo, matDark);
+      boardMesh.position.z = -0.1;
+      boardMesh.receiveShadow = true;
+      boardGroup.add(boardMesh);
+
+      // Side Walls
+      const wallGeo = new THREE.BoxGeometry(0.5, BOARD_HEIGHT, 1.5);
+      
+      const leftWallMesh = new THREE.Mesh(wallGeo, matBlue);
+      leftWallMesh.position.set(-BOARD_WIDTH / 2 - 0.25, 0, 0.65);
+      boardGroup.add(leftWallMesh);
+
+      const rightWallMesh = new THREE.Mesh(wallGeo, matBlue);
+      rightWallMesh.position.set(BOARD_WIDTH / 2 + 0.25, 0, 0.65);
+      boardGroup.add(rightWallMesh);
+
+      // Top Wall
+      const topWallGeo = new THREE.BoxGeometry(BOARD_WIDTH + 1.0, 0.5, 1.5);
+      const topWallMesh = new THREE.Mesh(topWallGeo, matBlue);
+      topWallMesh.position.set(0, BOARD_HEIGHT / 2 + 0.25, 0.65);
+      boardGroup.add(topWallMesh);
+
+      // Container Bottom Wall (Creates a realistic basin rim at the end of the board)
+      const bottomWallGeo = new THREE.BoxGeometry(BOARD_WIDTH + 1.0, 0.5, 1.5);
+      const bottomWallMesh = new THREE.Mesh(bottomWallGeo, matBlue);
+      bottomWallMesh.position.set(0, -BOARD_HEIGHT / 2 - 0.25, 0.65);
+      boardGroup.add(bottomWallMesh);
+
+      addAndroidLogo(boardGroup);
+      scene.add(boardGroup);
+    }
+
+    function addAndroidLogo(parent) {
+      const logoGroup = new THREE.Group();
+      logoGroup.position.set(0, 0, 0.01);
+
+      const headRadius = 2.5;
+      const headGeo = new THREE.RingGeometry(0, headRadius, 32, 1, 0, Math.PI);
+      
+      // Updated to Vibrant Hot Pink (#FF1493)
+      const logoMat = new THREE.MeshBasicMaterial({ color: 0xFF1493, opacity: 0.45, transparent: true, side: THREE.DoubleSide });
+      
+      const head = new THREE.Mesh(headGeo, logoMat);
+      head.position.set(0, -0.5, 0);
+      logoGroup.add(head);
+
+      const eyeGeo = new THREE.CircleGeometry(0.2, 16);
+      const eyeMat = new THREE.MeshBasicMaterial({ color: 0x121212 });
+      const leftEye = new THREE.Mesh(eyeGeo, eyeMat);
+      leftEye.position.set(-1.0, 0.6, 0.01);
+      const rightEye = new THREE.Mesh(eyeGeo, eyeMat);
+      rightEye.position.set(1.0, 0.6, 0.01);
+      logoGroup.add(leftEye, rightEye);
+
+      const antLength = 1.0;
+      const antWidth = 0.15;
+      const antGeo = new THREE.PlaneGeometry(antWidth, antLength);
+      
+      const antLeft = new THREE.Mesh(antGeo, logoMat);
+      antLeft.position.set(-1.1, headRadius - 0.1, 0.01);
+      antLeft.rotation.z = Math.PI / 6.5;
+      
+      const antRight = new THREE.Mesh(antGeo, logoMat);
+      antRight.position.set(1.1, headRadius - 0.1, 0.01);
+      antRight.rotation.z = -Math.PI / 6.5;
+
+      logoGroup.add(antLeft, antRight);
+      parent.add(logoGroup);
+    }
+
+    function buildBuckets() {
+      const bucketWidth = BOARD_WIDTH / NUM_BUCKETS;
+      const startX = -BOARD_WIDTH / 2 + bucketWidth / 2;
+      const yPos = -BOARD_HEIGHT / 2 + 1.2;
+
+      window.bucketMeshes = [];
+      bucketDividers = [];
+
+      for (let i = 0; i < NUM_BUCKETS; i++) {
+        const x = startX + i * bucketWidth;
+
+        if (i < NUM_BUCKETS - 1) {
+          const divGeo = new THREE.BoxGeometry(0.15, 2.4, 1.0);
+          const divMesh = new THREE.Mesh(divGeo, matBlue);
+          
+          const divPos = new THREE.Vector3(x + bucketWidth / 2, yPos, 0.5);
+          divPos.applyAxisAngle(new THREE.Vector3(1, 0, 0), -BOARD_ANGLE);
+          divMesh.position.copy(divPos);
+          divMesh.rotation.x = -BOARD_ANGLE;
+          scene.add(divMesh);
+
+          bucketDividers.push({
+            x: x + bucketWidth / 2,
+            yMin: yPos - 1.2,
+            yMax: yPos + 1.2,
+            width: 0.15
+          });
+        }
+
+        const floorGeo = new THREE.PlaneGeometry(bucketWidth - 0.2, 2.4);
+        const floorMesh = new THREE.Mesh(floorGeo, matDark.clone());
+        const floorPos = new THREE.Vector3(x, yPos - 0.2, 0.02);
+        floorPos.applyAxisAngle(new THREE.Vector3(1, 0, 0), -BOARD_ANGLE);
+        floorMesh.position.copy(floorPos);
+        floorMesh.rotation.x = -BOARD_ANGLE;
+        
+        scene.add(floorMesh);
+        window.bucketMeshes.push(floorMesh);
+      }
+    }
+
+    function buildPegsAndHoles() {
+      const yStart = BOARD_HEIGHT / 2 - 4.2;
+      const yEnd = -BOARD_HEIGHT / 2 + 3.5;
+      const rowSpacing = (yStart - yEnd) / (ROWS - 1);
+
+      activePoles = [];
+
+      for (let r = 0; r < ROWS; r++) {
+        const y = yStart - r * rowSpacing;
+        const isOdd = r % 2 === 1;
+        const cols = isOdd ? COLS_ODD : COLS_EVEN;
+        const xSpacing = BOARD_WIDTH / (cols + 1);
+        const xStart = -BOARD_WIDTH / 2 + xSpacing;
+
+        for (let c = 0; c < cols; c++) {
+          const x = xStart + c * xSpacing;
+          const isHydraulic = Math.random() < 0.5;
+          createPegHoleAssembly(x, y, isHydraulic);
+        }
+      }
+    }
+
+    function createPegHoleAssembly(x, y, isHydraulic) {
+      const boardRot = new THREE.Matrix4().makeRotationX(-BOARD_ANGLE);
+      const basePos = new THREE.Vector3(x, y, 0).applyMatrix4(boardRot);
+
+      const holeGeo = new THREE.RingGeometry(POLE_RADIUS, POLE_RADIUS + 0.1, 16);
+      const holeMat = new THREE.MeshBasicMaterial({ color: 0x0D47A1, side: THREE.DoubleSide });
+      const holeMesh = new THREE.Mesh(holeGeo, holeMat);
+      holeMesh.position.copy(basePos);
+      holeMesh.position.add(new THREE.Vector3(0, 0, 0.01).applyMatrix4(boardRot));
+      holeMesh.rotation.x = -BOARD_ANGLE;
+      scene.add(holeMesh);
+
+      const poleHeight = 1.8;
+      const poleGeo = new THREE.CylinderGeometry(POLE_RADIUS, POLE_RADIUS, poleHeight, 16);
+      poleGeo.rotateX(Math.PI / 2);
+      
+      const poleMesh = new THREE.Mesh(poleGeo, isHydraulic ? matBlueEmissive : matDark);
+      poleMesh.castShadow = true;
+      scene.add(poleMesh);
+
+      const poleData = {
+        x: x,
+        y: y,
+        mesh: poleMesh,
+        basePos: basePos,
+        isHydraulic: isHydraulic,
+        retracted: false,
+        phase: Math.random() * Math.PI * 2,
+        speed: 1.5 + Math.random() * 2.0,
+        zOffset: 0.6
+      };
+
+      if (isHydraulic && Math.random() > 0.5) {
+        poleData.retracted = true;
+        poleData.zOffset = -0.8;
+      }
+
+      updatePolePosition(poleData);
+      activePoles.push(poleData);
+    }
+
+    function updatePolePosition(poleData) {
+      const normalVector = new THREE.Vector3(0, Math.sin(BOARD_ANGLE), Math.cos(BOARD_ANGLE));
+      const currentPos = poleData.basePos.clone().add(normalVector.clone().multiplyScalar(poleData.zOffset));
+
+      poleData.mesh.position.copy(currentPos);
+      poleData.mesh.rotation.x = -BOARD_ANGLE;
+    }
+
+    // --- BALL CREATION & CONTROL ---
+    function createBall() {
+      const ballGeo = new THREE.SphereGeometry(BALL_RADIUS, 32, 32);
+      // Mesh configured to Android Green
+      ballMesh = new THREE.Mesh(ballGeo, matBallGreen);
+      ballMesh.castShadow = true;
+      scene.add(ballMesh);
+
+      resetBallToTop();
+    }
+
+    function syncMeshWithPhysics() {
+      const localPos = new THREE.Vector3(ballPhysics.pos.x, ballPhysics.pos.y, ballPhysics.pos.z);
+      localPos.applyAxisAngle(new THREE.Vector3(1, 0, 0), -BOARD_ANGLE);
+      ballMesh.position.copy(localPos);
+    }
+
+    function resetBallToTop() {
+      ballState = 'PRE_DROP';
+      stuckTimer = 0;
+
+      const startY = BOARD_HEIGHT / 2 - 1.8;
+      ballPhysics.pos.set(0, startY, BALL_RADIUS);
+      ballPhysics.vel.set(0, 0, 0);
+
+      syncMeshWithPhysics();
+      document.getElementById('instructions').innerText = "Drag ball horizontally and release to drop!";
+      document.getElementById('instructions').classList.remove('hidden');
+    }
+
+    function dropBall() {
+      if (ballState !== 'PRE_DROP') return;
+
+      ballState = 'DROPPING';
+      stuckTimer = 0;
+      
+      const randomJitter = (Math.random() - 0.5) * 0.4;
+      ballPhysics.vel.set(randomJitter, -2.0, 0);
+
+      document.getElementById('instructions').classList.add('hidden');
+    }
+
+    // --- PHYSICS ENGINE ---
+    function updatePhysics(dt) {
+      if (ballState !== 'DROPPING' && ballState !== 'SETTLING') return;
+
+      ballPhysics.vel.y += GRAVITY_Y * dt;
+      ballPhysics.vel.x *= ballPhysics.friction;
+      ballPhysics.vel.y *= ballPhysics.friction;
+
+      ballPhysics.pos.x += ballPhysics.vel.x * dt;
+      ballPhysics.pos.y += ballPhysics.vel.y * dt;
+
+      // Wall Collisions
+      const minX = -BOARD_WIDTH / 2 + BALL_RADIUS;
+      const maxX = BOARD_WIDTH / 2 - BALL_RADIUS;
+
+      if (ballPhysics.pos.x < minX) {
+        ballPhysics.pos.x = minX;
+        ballPhysics.vel.x *= -ballPhysics.restitution;
+      } else if (ballPhysics.pos.x > maxX) {
+        ballPhysics.pos.x = maxX;
+        ballPhysics.vel.x *= -ballPhysics.restitution;
+      }
+
+      const maxY = BOARD_HEIGHT / 2 - BALL_RADIUS - 0.2;
+      if (ballPhysics.pos.y > maxY) {
+        ballPhysics.pos.y = maxY;
+        if (ballPhysics.vel.y > 0) ballPhysics.vel.y *= -ballPhysics.restitution;
+      }
+
+      // Bottom Container Collision with realistic Bouncing
+      const minY = -BOARD_HEIGHT / 2 + BALL_RADIUS;
+      if (ballPhysics.pos.y <= minY) {
+        ballPhysics.pos.y = minY;
+        if (Math.abs(ballPhysics.vel.y) > 0.5) {
+          ballPhysics.vel.y = -ballPhysics.vel.y * ballPhysics.restitution;
+          ballPhysics.vel.x *= 0.8; // Floor friction dampening
+        } else {
+          ballPhysics.vel.y = 0;
+          ballPhysics.vel.x *= 0.9;
+        }
+      }
+
+      // Pole Collisions
+      for (let i = 0; i < activePoles.length; i++) {
+        const pole = activePoles[i];
+        if (pole.zOffset < 0.1) continue;
+
+        const dx = ballPhysics.pos.x - pole.x;
+        const dy = ballPhysics.pos.y - pole.y;
+        const distSq = dx * dx + dy * dy;
+        const minDist = BALL_RADIUS + POLE_RADIUS;
+
+        if (distSq < minDist * minDist) {
+          const dist = Math.sqrt(distSq);
+          if (dist === 0) continue;
+
+          const nx = dx / dist;
+          const ny = dy / dist;
+
+          const overlap = minDist - dist;
+          ballPhysics.pos.x += nx * overlap;
+          ballPhysics.pos.y += ny * overlap;
+
+          const dot = ballPhysics.vel.x * nx + ballPhysics.vel.y * ny;
+          if (dot < 0) {
+            ballPhysics.vel.x -= (1 + ballPhysics.restitution) * dot * nx;
+            ballPhysics.vel.y -= (1 + ballPhysics.restitution) * dot * ny;
+
+            const tangential = (Math.random() - 0.5) * 1.5;
+            ballPhysics.vel.x += -ny * tangential;
+            ballPhysics.vel.y += nx * tangential;
+          }
+        }
+      }
+
+      // Bucket Divider Collisions
+      for (let i = 0; i < bucketDividers.length; i++) {
+        const div = bucketDividers[i];
+        if (ballPhysics.pos.y >= div.yMin && ballPhysics.pos.y <= div.yMax) {
+          const divMinX = div.x - div.width / 2 - BALL_RADIUS;
+          const divMaxX = div.x + div.width / 2 + BALL_RADIUS;
+
+          if (ballPhysics.pos.x > divMinX && ballPhysics.pos.x < divMaxX) {
+            if (ballPhysics.pos.x < div.x) {
+              ballPhysics.pos.x = divMinX;
+              ballPhysics.vel.x *= -ballPhysics.restitution;
+            } else {
+              ballPhysics.pos.x = divMaxX;
+              ballPhysics.vel.x *= -ballPhysics.restitution;
+            }
+          }
+        }
+      }
+
+      preventBallStuck(dt);
+      syncMeshWithPhysics();
+    }
+
+    function preventBallStuck(dt) {
+      if (ballState !== 'DROPPING') return;
+
+      const speed = ballPhysics.vel.length();
+      if (speed < 0.8 && ballPhysics.pos.y > -BOARD_HEIGHT / 2 + 2.5) {
+        stuckTimer += dt;
+      } else {
+        stuckTimer = 0;
+      }
+
+      if (stuckTimer > 0.35) {
+        stuckTimer = 0;
+        const nudgeX = (Math.random() > 0.5 ? 1 : -1) * (1.5 + Math.random() * 2.0);
+        ballPhysics.vel.x += nudgeX;
+        ballPhysics.vel.y -= 2.0;
+      }
+    }
+
+    // --- GAME LOGIC & MODAL CONTROLS ---
+    function pickRandomTarget() {
+      let newTarget = targetBucket;
+      while (newTarget === targetBucket && NUM_BUCKETS > 1) {
+        newTarget = Math.floor(Math.random() * NUM_BUCKETS);
+      }
+      targetBucket = newTarget;
+      document.getElementById('target-val').innerText = `#${targetBucket + 1}`;
+
+      window.bucketMeshes.forEach((mesh, idx) => {
+        if (idx === targetBucket) {
+          mesh.material = matOrangeTarget;
+        } else {
+          mesh.material = matDark;
+        }
+      });
+    }
+
+    function changeTargetPosition() {
+      pickRandomTarget();
+      flashMessage(`New Target Selected: Bucket #${targetBucket + 1}`);
+    }
+
+    function checkScoring() {
+      if (ballState !== 'DROPPING') return;
+
+      const minY = -BOARD_HEIGHT / 2 + BALL_RADIUS;
+      if (ballPhysics.pos.y <= minY + 0.1) {
+        ballState = 'SETTLING';
+
+        const bucketWidth = BOARD_WIDTH / NUM_BUCKETS;
+        const normX = ballPhysics.pos.x + BOARD_WIDTH / 2;
+        const landedBucket = Math.floor(normX / bucketWidth);
+
+        if (landedBucket === targetBucket) {
+          score += 100;
+          document.getElementById('score-val').innerText = score;
+          flashMessage("SCORE! +100");
+        } else {
+          flashMessage("MISSED!");
+        }
+
+        setTimeout(() => {
+          advanceRound();
+        }, 1600);
+      }
+    }
+
+    function advanceRound() {
+      round++;
+      document.getElementById('round-val').innerText = round;
+      // Target remains unchanged across rounds
+      resetBallToTop();
+    }
+
+    function resetGame() {
+      score = 0;
+      round = 1;
+      document.getElementById('score-val').innerText = '0';
+      document.getElementById('round-val').innerText = '1';
+      pickRandomTarget();
+      resetBallToTop();
+    }
+
+    function openRulesModal() {
+      document.getElementById('rules-modal').classList.remove('hidden');
+    }
+
+    function closeRulesModal() {
+      document.getElementById('rules-modal').classList.add('hidden');
+    }
+
+    function flashMessage(msg) {
+      const el = document.getElementById('instructions');
+      el.innerText = msg;
+      el.classList.remove('hidden');
+    }
+
+    // --- TOUCH & MOUSE INTERACTION ---
+    function getPointerBoardX(e) {
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+
+      mouse.x = (clientX / window.innerWidth) * 2 - 1;
+      mouse.y = -(clientY / window.innerHeight) * 2 + 1;
+
+      raycaster.setFromCamera(mouse, camera);
+      const intersectPoint = new THREE.Vector3();
+      raycaster.ray.intersectPlane(plane, intersectPoint);
+
+      intersectPoint.applyAxisAngle(new THREE.Vector3(1, 0, 0), BOARD_ANGLE);
+      return intersectPoint.x;
+    }
+
+    function onPointerDown(e) {
+      if (ballState !== 'PRE_DROP') return;
+      isDragging = true;
+      const boardX = getPointerBoardX(e);
+      dragOffset = ballPhysics.pos.x - boardX;
+    }
+
+    function onPointerMove(e) {
+      if (!isDragging || ballState !== 'PRE_DROP') return;
+      
+      let newX = getPointerBoardX(e);
+      
+      const maxX = BOARD_WIDTH / 2 - BALL_RADIUS - 0.2;
+      newX = Math.max(-maxX, Math.min(maxX, newX));
+
+      ballPhysics.pos.x = newX;
+      syncMeshWithPhysics();
+    }
+
+    function onPointerUp() {
+      if (isDragging && ballState === 'PRE_DROP') {
+        isDragging = false;
+        dropBall();
+      }
+    }
+
+    function onWindowResize() {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    }
+
+    // --- HYDRAULIC POLE ANIMATION ---
+    function updateHydraulics(dt) {
+      activePoles.forEach(pole => {
+        if (!pole.isHydraulic) return;
+
+        pole.phase += dt * pole.speed;
+        const wave = Math.sin(pole.phase);
+        
+        if (wave > 0) {
+          pole.zOffset = THREE.MathUtils.lerp(-0.8, 0.6, wave);
+        } else {
+          pole.zOffset = -0.8;
+        }
+
+        updatePolePosition(pole);
+      });
+    }
+
+    // --- MAIN LOOP ---
+    const clock = new THREE.Clock();
+
+    function animate() {
+      requestAnimationFrame(animate);
+
+      const dt = Math.min(clock.getDelta(), 0.033);
+
+      updateHydraulics(dt);
+      updatePhysics(dt);
+      checkScoring();
+
+      renderer.render(scene, camera);
+    }
+
+    window.onload = init;
+  </script>
+</body>
+</html>
