@@ -1,2 +1,2 @@
-# Plinko-_forAndroid
+# Plinko!_forAndroid
 drop the ball
